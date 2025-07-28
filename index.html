@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Webhook Sender</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .glow-on-hover:hover {
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.6);
+        }
+        .input-glow:focus {
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+            border-color: rgba(99, 102, 241, 0.6);
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-gray-800 rounded-xl shadow-2xl overflow-hidden">
+        <div class="bg-indigo-600 p-6 text-center">
+            <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
+                <i class="fab fa-discord"></i> Discord Webhook Sender
+            </h1>
+            <p class="text-indigo-200 mt-2">Send messages to your Discord server</p>
+        </div>
+        
+        <div class="p-6">
+            <form id="webhookForm" class="space-y-4">
+                <div>
+                    <label for="webhookUrl" class="block text-sm font-medium text-gray-300 mb-1">
+                        Webhook URL
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-link text-gray-400"></i>
+                        </div>
+                        <input 
+                            type="url" 
+                            id="webhookUrl" 
+                            required
+                            placeholder="https://discord.com/api/webhooks/..."
+                            class="pl-10 w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-gray-200 placeholder-gray-400 focus:outline-none input-glow transition duration-200"
+                        >
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="message" class="block text-sm font-medium text-gray-300 mb-1">
+                        Message Content
+                    </label>
+                    <textarea 
+                        id="message" 
+                        rows="4" 
+                        required
+                        placeholder="Type your message here..."
+                        class="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 px-4 text-gray-200 placeholder-gray-400 focus:outline-none input-glow transition duration-200"
+                    ></textarea>
+                </div>
+                
+                <div class="pt-2">
+                    <button 
+                        type="submit" 
+                        id="sendButton"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg glow-on-hover transition duration-200 flex items-center justify-center gap-2"
+                    >
+                        <i class="fas fa-paper-plane"></i> Send Message
+                    </button>
+                </div>
+            </form>
+            
+            <div id="statusMessage" class="mt-4 hidden p-3 rounded-lg"></div>
+        </div>
+        
+        <div class="bg-gray-700 px-6 py-3 text-center text-sm text-gray-400">
+            <p>Messages will be sent to your Discord channel</p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('webhookForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const webhookUrl = document.getElementById('webhookUrl').value.trim();
+            const message = document.getElementById('message').value.trim();
+            const sendButton = document.getElementById('sendButton');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            // Validate inputs
+            if (!webhookUrl || !message) {
+                showStatus('Please fill in all fields', 'error');
+                return;
+            }
+            
+            if (!webhookUrl.startsWith('https://discord.com/api/webhooks/')) {
+                showStatus('Please enter a valid Discord webhook URL', 'error');
+                return;
+            }
+            
+            // Disable button during request
+            sendButton.disabled = true;
+            sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: message,
+                    }),
+                });
+                
+                if (response.ok) {
+                    showStatus('Message sent successfully!', 'success');
+                    document.getElementById('message').value = '';
+                    
+                    // Add pulse animation to button temporarily
+                    sendButton.classList.add('pulse');
+                    setTimeout(() => {
+                        sendButton.classList.remove('pulse');
+                    }, 2000);
+                } else {
+                    const errorData = await response.json();
+                    showStatus(`Failed to send message: ${errorData.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                console.error('Error:', error);
+            } finally {
+                sendButton.disabled = false;
+                sendButton.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
+            }
+        });
+        
+        function showStatus(message, type) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = message;
+            statusMessage.className = 'mt-4 p-3 rounded-lg';
+            
+            if (type === 'success') {
+                statusMessage.classList.add('bg-green-800', 'text-green-200');
+            } else {
+                statusMessage.classList.add('bg-red-800', 'text-red-200');
+            }
+            
+            statusMessage.classList.remove('hidden');
+            
+            // Hide status message after 5 seconds
+            setTimeout(() => {
+                statusMessage.classList.add('hidden');
+            }, 5000);
+        }
+        
+        // Add some interactivity to inputs
+        document.querySelectorAll('input, textarea').forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.querySelector('label').classList.add('text-indigo-400');
+            });
+            
+            input.addEventListener('blur', function() {
+                this.parentElement.querySelector('label').classList.remove('text-indigo-400');
+            });
+        });
+    </script>
+</body>
+</html>
